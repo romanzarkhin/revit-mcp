@@ -4,14 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 export async function registerTools(server: McpServer) {
-  // 获取当前文件的目录路径
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  // 读取tools目录下的所有文件
   const files = fs.readdirSync(__dirname);
-
-  // 过滤出.ts或.js文件，但排除index文件和register文件
   const toolFiles = files.filter(
     (file) =>
       (file.endsWith(".ts") || file.endsWith(".js")) &&
@@ -21,16 +17,10 @@ export async function registerTools(server: McpServer) {
       file !== "register.js"
   );
 
-  // 动态导入并注册每个工具
   for (const file of toolFiles) {
     try {
-      // 构建导入路径
       const importPath = `./${file.replace(/\.(ts|js)$/, ".js")}`;
-
-      // 动态导入模块
       const module = await import(importPath);
-
-      // 查找并执行注册函数
       const registerFunctionName = Object.keys(module).find(
         (key) => key.startsWith("register") && typeof module[key] === "function"
       );
@@ -45,27 +35,25 @@ export async function registerTools(server: McpServer) {
       console.error(`注册工具 ${file} 时出错:`, error);
     }
   }
-}
 
-const fs = require('fs');
-const path = require('path');
+  // ✅ Now also register temp iterations
+  const tempIterationsPath = path.join(__dirname, 'temp-iterations');
+  if (fs.existsSync(tempIterationsPath)) {
+    fs.readdirSync(tempIterationsPath).forEach((file) => {
+      if (file.endsWith('.js')) {
+        const modulePath = path.join(tempIterationsPath, file);
+        const tool = require(modulePath);
 
-const tempIterationsPath = path.join(__dirname, 'temp-iterations');
-if (fs.existsSync(tempIterationsPath)) {
-  fs.readdirSync(tempIterationsPath).forEach((file) => {
-    if (file.endsWith('.js')) {
-      const modulePath = path.join(tempIterationsPath, file);
-      const tool = require(modulePath);
+        if (typeof tool.register === 'function') {
+          tool.register(server);
+        }
 
-      if (typeof tool.register === 'function') {
-        tool.register(server);
+        const meta = tool.metadata || {};
+        console.log(`[ITERATION] Registered: ${meta.title || file}`);
+        console.log(`  └ Description: ${meta.description || 'n/a'}`);
+        console.log(`  └ Origin: ${meta.origin || 'unknown'}`);
+        console.log(`  └ Created: ${meta.created ? new Date(meta.created).toLocaleString() : 'n/a'}`);
       }
-
-      const meta = tool.metadata || {};
-      console.log(`[ITERATION] Registered: ${meta.title || file}`);
-      console.log(`  └ Description: ${meta.description || 'n/a'}`);
-      console.log(`  └ Origin: ${meta.origin || 'unknown'}`);
-      console.log(`  └ Created: ${meta.created ? new Date(meta.created).toLocaleString() : 'n/a'}`);
-    }
-  });
+    });
+  }
 }
