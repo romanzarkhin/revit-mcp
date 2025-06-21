@@ -1,71 +1,81 @@
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { withRevitConnection } from "../utils/ConnectionManager.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-export async function registerTools(server: McpServer) {
-  // 获取当前文件的目录路径
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  // 读取tools目录下的所有文件
-  const files = fs.readdirSync(__dirname);
-
-  // 过滤出.ts或.js文件，但排除index文件和register文件
-  const toolFiles = files.filter(
-    (file) =>
-      (file.endsWith(".ts") || file.endsWith(".js")) &&
-      file !== "index.ts" &&
-      file !== "index.js" &&
-      file !== "register.ts" &&
-      file !== "register.js"
-  );
-
-  // 动态导入并注册每个工具
-  for (const file of toolFiles) {
-    try {
-      // 构建导入路径
-      const importPath = `./${file.replace(/\.(ts|js)$/, ".js")}`;
-
-      // 动态导入模块
-      const module = await import(importPath);
-
-      // 查找并执行注册函数
-      const registerFunctionName = Object.keys(module).find(
-        (key) => key.startsWith("register") && typeof module[key] === "function"
-      );
-
-      if (registerFunctionName) {
-        module[registerFunctionName](server);
-        console.error(`已注册工具: ${file}`);
-      } else {
-        console.warn(`警告: 在文件 ${file} 中未找到注册函数`);
-      }
-    } catch (error) {
-      console.error(`注册工具 ${file} 时出错:`, error);
-    }
+const saveIterationToFile = (code: string, iterationNumber: number) => {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const dirPath = path.join(__dirname, "temp-iterations");
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
-}
 
-const fs = require('fs');
-const path = require('path');
+  const filePath = path.join(dirPath, `iteration-${iterationNumber}__auto_saved.js`);
+  const wrapped = `module.exports = {
+  register: () => {},
+    metadata: {
+      iteration: true,
+      title: "Auto-Saved Iteration ${iterationNumber}",
+      description: "Generated fallback iteration saved for reference.",
+      origin: "fallback from send_code_to_revit",
+      created: ${iterationNumber}
+    },
+    code: \`${code.replace(/`/g, '\\`')}\`
+  }`;
+  fs.writeFileSync(filePath, wrapped, { encoding: "utf-8" });
+};
 
-const tempIterationsPath = path.join(__dirname, 'temp-iterations');
-if (fs.existsSync(tempIterationsPath)) {
-  fs.readdirSync(tempIterationsPath).forEach((file) => {
-    if (file.endsWith('.js')) {
-      const modulePath = path.join(tempIterationsPath, file);
-      const tool = require(modulePath);
+export function registerSendCodeToRevitTool(server: McpServer) {
+  server.tool(
+    "send_code_to_revit",
+    "Send C# code to Revit for execution. The code will be inserted into a template with access to the Revit Document and parameters. Your code should be written to work within the Execute method of the template.",
+    {
+      code: z
+        .string()
+        .describe(
+          "The C# code to execute in Revit. This code will be inserted into the Execute method of a template with access to Document and parameters."
+        ),
+      parameters: z
+        .array(z.any())
+        .optional()
+        .describe(
+          "Optional execution parameters that will be passed to your code"
+        ),
+    },
+    async (args, extra) => {
+      const params = {
+        code: args.code,
+        parameters: args.parameters || [],
+      };
 
-      if (typeof tool.register === 'function') {
-        tool.register(server);
+      const iterationNumber = Date.now();
+      saveIterationToFile(args.code, iterationNumber);
+
+      try {
+        const response = await withRevitConnection(async (revitClient) => {
+          return await revitClient.sendCommand("send_code_to_revit", params);
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Code execution successful!\nResult: ${JSON.stringify(response, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Code execution failed: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
       }
-
-      const meta = tool.metadata || {};
-      console.log(`[ITERATION] Registered: ${meta.title || file}`);
-      console.log(`  └ Description: ${meta.description || 'n/a'}`);
-      console.log(`  └ Origin: ${meta.origin || 'unknown'}`);
-      console.log(`  └ Created: ${meta.created ? new Date(meta.created).toLocaleString() : 'n/a'}`);
     }
-  });
+  );
 }
