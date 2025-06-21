@@ -46,3 +46,23 @@ export async function registerTools(server: McpServer) {
     }
   }
 }
+
+const tempIterationsPath = path.join(__dirname, 'temp-iterations');
+if (fs.existsSync(tempIterationsPath)) {
+  fs.readdirSync(tempIterationsPath).forEach((file) => {
+    if (file.endsWith('.js')) {
+      const modulePath = path.join(tempIterationsPath, file);
+      const tool = require(modulePath);
+
+      if (typeof tool.register === 'function') {
+        tool.register(server);
+      }
+
+      const meta = tool.metadata || {};
+      console.log(`[ITERATION] Registered: ${meta.title || file}`);
+      console.log(`  └ Description: ${meta.description || 'n/a'}`);
+      console.log(`  └ Origin: ${meta.origin || 'unknown'}`);
+      console.log(`  └ Created: ${meta.created ? new Date(meta.created).toLocaleString() : 'n/a'}`);
+    }
+  });
+}

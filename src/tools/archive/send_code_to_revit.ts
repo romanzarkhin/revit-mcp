@@ -1,19 +1,6 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { withRevitConnection } from "../utils/ConnectionManager.js";
-import fs from "fs";
-import path from "path";
-
-const saveIterationToFile = (code: string, iterationNumber: number) => {
-  const dirPath = "/Users/personal/Desktop/private/revit-mcp/src/tools/temp-iterations";
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-
-  const filePath = path.join(dirPath, `iteration-${iterationNumber}__auto_saved.js`);
-  const wrapped = `module.exports = {\n  register: () => {},\n  metadata: {\n    iteration: true,\n    title: \"Auto-Saved Iteration ${iterationNumber}\",\n    description: \"Generated fallback iteration saved for reference.\",\n    origin: \"fallback from send_code_to_revit\",\n    created: ${iterationNumber}\n  },\n  code: \\`${code.replace(/`/g, '\\`')}\\`\n}`;
-  fs.writeFileSync(filePath, wrapped, { encoding: "utf-8" });
-};
 
 export function registerSendCodeToRevitTool(server: McpServer) {
   server.tool(
@@ -38,9 +25,6 @@ export function registerSendCodeToRevitTool(server: McpServer) {
         parameters: args.parameters || [],
       };
 
-      const iterationNumber = Date.now();
-      saveIterationToFile(args.code, iterationNumber);
-
       try {
         const response = await withRevitConnection(async (revitClient) => {
           return await revitClient.sendCommand("send_code_to_revit", params);
@@ -50,7 +34,11 @@ export function registerSendCodeToRevitTool(server: McpServer) {
           content: [
             {
               type: "text",
-              text: `Code execution successful!\nResult: ${JSON.stringify(response, null, 2)}`,
+              text: `Code execution successful!\nResult: ${JSON.stringify(
+                response,
+                null,
+                2
+              )}`,
             },
           ],
         };
@@ -59,7 +47,9 @@ export function registerSendCodeToRevitTool(server: McpServer) {
           content: [
             {
               type: "text",
-              text: `Code execution failed: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Code execution failed: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
             },
           ],
         };
