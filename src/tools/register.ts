@@ -47,6 +47,9 @@ export async function registerTools(server: McpServer) {
   }
 }
 
+const fs = require('fs');
+const path = require('path');
+
 const tempIterationsPath = path.join(__dirname, 'temp-iterations');
 if (fs.existsSync(tempIterationsPath)) {
   fs.readdirSync(tempIterationsPath).forEach((file) => {

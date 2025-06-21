@@ -3,9 +3,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { withRevitConnection } from "../utils/ConnectionManager.js";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 const saveIterationToFile = (code: string, iterationNumber: number) => {
-  const dirPath = "/Users/personal/Desktop/private/revit-mcp/src/tools/temp-iterations";
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const dirPath = path.join(__dirname, "temp-iterations");
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
