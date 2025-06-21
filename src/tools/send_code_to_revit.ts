@@ -13,7 +13,17 @@ const saveIterationToFile = (code: string, iterationNumber: number) => {
   }
 
   const filePath = path.join(dirPath, `iteration-${iterationNumber}__auto_saved.js`);
-  const wrapped = `module.exports = {\n  register: () => {},\n  metadata: {\n    iteration: true,\n    title: \"Auto-Saved Iteration ${iterationNumber}\",\n    description: \"Generated fallback iteration saved for reference.\",\n    origin: \"fallback from send_code_to_revit\",\n    created: ${iterationNumber}\n  },\n  code: \\`${code.replace(/`/g, '\\`')}\\`\n}`;
+  const wrapped = `module.exports = {
+  register: () => {},
+    metadata: {
+      iteration: true,
+      title: "Auto-Saved Iteration ${iterationNumber}",
+      description: "Generated fallback iteration saved for reference.",
+      origin: "fallback from send_code_to_revit",
+      created: ${iterationNumber}
+    },
+    code: \`${code.replace(/`/g, '\\`')}\`
+  }`;
   fs.writeFileSync(filePath, wrapped, { encoding: "utf-8" });
 };
 
